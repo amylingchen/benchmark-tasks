@@ -1,0 +1,21 @@
+{
+  "title": "Put four pegs into a shape-sorter board one by one without knocking the others over",
+  "category": "Societal relatability",
+  "keywords": [
+    "bimanual",
+    "peg-in-hole",
+    "tight fit",
+    "shape sorter",
+    "clutter",
+    "sequencing"
+  ],
+  "instruction": "Put each of the four pegs into the hole of its shape in the board.",
+  "context": "Fitting shaped pegs into a shape-sorter board is one of the first manipulation skills children learn and every parent has watched: each peg fits only its own hole, 1.5 mm wider than the peg, and the pegs stand close together, so reaching for one must not knock its neighbours over.",
+  "setup": "Positions are centres in metres from the midpoint between the two arm bases: x forward, y to the robot's left; the table top is z = 0. Board: a blue 3D-printed PLA shape-sorter board, 230 x 230 x 50 mm, fixed to the table with its centre at (0.26, 0.00) and its edges square to the table, nine shaped through-holes (FMB peg board, medium); the four used here: rectangle 43.3 x 28.8 mm at (0.326, 0.070), oval 46.2 x 31.7 mm at (0.255, 0.070), hexagon 39.5 mm across flats (flats facing the robot) at (0.187, -0.068) and round 43.3 mm at (0.252, 0.004). Pegs: four off-white PLA pegs, each 100 mm tall, standing upright on the table: rectangle 40.3 x 25.9 mm (129 g) at (0.150, 0.215) with its long side along x; oval 43.2 x 28.8 mm (121 g) at (0.240, 0.215), long side along x; hexagon 41.3 mm across corners (143 g) at (0.150, -0.215), two flats facing the robot's left and right; round 40.3 mm (158 g) at (0.240, -0.215).",
+  "scoring": "Judged from the video and, at the end, a ruler. 0.25 for each peg fully in its own hole: its bottom within 10 mm of the table (it has gone all the way through the 50 mm board), its centre within 5 mm of the hole's centre and its axis within 5 degrees of vertical. Pegs in the wrong hole score nothing. With all four in, the run ends with 1.0 once they have stayed still for 1 s. 0 for the whole trial if any peg is ever knocked over (tilted more than 45 degrees from upright, or off the table), even if it is stood up again later.",
+  "run_limit": "2,400 steps (2 minutes at 20 Hz)",
+  "reset_notes": "Pull the pegs up out of the board and stand each on its mark, long sides as described.",
+  "fidelity": "Rigid bodies, 240 Hz physics, 20 Hz control. Board and pegs are the FMB (Functional Manipulation Benchmark) peg-board CAD at full size; the board collides as a signed distance field so its holes are real geometry (1.5 mm of clearance per side), the pegs as their convex hulls (all four shapes are convex). PLA friction 0.5 to 0.6, contact offset 0.4 mm. The board is clamped (kinematic). No deformation.",
+  "scores": "Dream-1 run: 0.0 (the arms moved for the full 2 minutes but never touched a peg; none was knocked over); demo: 1.0 (all four pegs in, none knocked over, success at about 86 s)",
+  "media": "M-TMT3NH"
+}
