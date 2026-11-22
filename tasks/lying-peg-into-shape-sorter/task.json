@@ -1,0 +1,21 @@
+{
+  "title": "Stand a peg lying on its side up and push it through its shape-sorter hole",
+  "category": "Societal relatability",
+  "keywords": [
+    "bimanual",
+    "reorientation",
+    "regrasp",
+    "peg-in-hole",
+    "tight fit",
+    "shape sorter"
+  ],
+  "instruction": "Put the peg into the rectangular hole in the board.",
+  "context": "A peg that has fallen over cannot go straight into its hole: it has to be picked up, turned on end in the hand and lined up within 1.5 mm, which people do without thinking and robots still find hard. The peg lies on the far side from the board, so the robot also has to get it across.",
+  "setup": "Positions are centres in metres from the midpoint between the two arm bases: x forward, y to the robot's left; the table top is z = 0. Peg: an off-white PLA rectangular peg, 100 x 40.3 x 25.9 mm (129 g), lying on one of its 100 x 25.9 mm sides with its long axis along x, its far end at (0.40, 0.20), its near end at (0.30, 0.20). Board: a blue 3D-printed PLA shape-sorter board, 230 x 230 x 50 mm, fixed to the table with its centre at (0.24, -0.21) and its edges square to the table, nine shaped through-holes (FMB peg board, medium); its rectangular hole, 43.3 x 28.8 mm with the long side along x, is at (0.306, -0.140).",
+  "scoring": "Step by step, judged from the video; each step counts once reached. 0.25 grasped: one gripper alone has lifted the peg so its lowest point is 3 cm above the table. 0.5 handed over: after that, the other gripper alone holds the peg with its lowest point off the table. 0.75 in the target hole: the peg's lower end is in the rectangular hole, its centre within 5 mm of the hole's centre, its axis within 5 degrees of vertical and its lowest point at most 30 mm above the table. 1.0, ending the run: the peg is fully in (lowest point within 10 mm of the table, through the 50 mm board), released by both grippers and still for 1 s. 0 if the peg ends off the table. A gripper holds the peg when its fingertip centre is within the peg's outline (grown by 6 mm) and both fingers press on it.",
+  "run_limit": "1,200 steps (1 minute at 20 Hz)",
+  "reset_notes": "Pull the peg out of the board and lay it at its mark on its 25.9 mm side, long axis along x.",
+  "fidelity": "Rigid bodies, 240 Hz physics, 20 Hz control. Board and peg are the FMB (Functional Manipulation Benchmark) peg-board CAD at full size; the board collides as a signed distance field so its holes are real geometry (1.5 mm of clearance per side), the peg as its convex hull. PLA friction 0.5 to 0.6, contact offset 0.4 mm. The board is clamped (kinematic). No deformation.",
+  "scores": "Dream-1 run: 0.0 (both arms moved over the table for the full 2 minutes but never touched the peg); demo: 1.0 (grasped at 5.5 s, handed over at 18.0 s, in the hole at 26.8 s, success at about 31 s)",
+  "media": "M-7ZDJNZ"
+}
