@@ -16,5 +16,6 @@
   "run_limit": "1,600 steps (80 s at 20 Hz); the scripted demo is fitted by about step 600 and done by 810.",
   "reset_notes": "Nothing is consumed. Press both connector release buttons and pull the booster off the bars, hold the adjustment button and pull the arms out 100 mm, and set the booster back at its start (the release buttons are not modelled in the simulation).",
   "fidelity": "Rigid bodies, PhysX 240 Hz. Rigid car seat, no foam; bars in an open bight. Both arms are one bracket; with the button out its slide is pinned where it is (the ratchet), held in it slides at 3 N. Each catch is a sprung plunger (40 N/m) the bar lifts on a ramp. The armrest window stands in for the arm's green area. Booster mass and sizes, connector, guide, button and friction 0.4 are estimates; 6 mm bars from UN R145, 280 mm the usual ISOFIX spacing.",
-  "scores": "Dream-1 run: 0.0; demo: 1.0"
+  "scores": "Dream-1 run: 0.0; demo: 1.0",
+  "media": "M-C3ZV65"
 }
