@@ -47,13 +47,20 @@ No third-party assets. All geometry is built in code from the dimensions below.
   off the table top, on any other face, near the table's edge); while on, a foot is more than 5 mm off the table top, it is more than 10
   deg from upright or a foot is within 5 cm of the table's edge; or at any time a corner is 5 cm below the table top. The
   booklet: "Always operate the toaster on a stable, heat resistant surface."
-- **Dropped**: any corner of it comes down more than 7 mm in 1/30 s (0.21 m/s). Turning it round on the table or raising it
-  is not falling. The simulator takes the largest fall in any 1/30 s window, sampled every 1/240 s. A real trial uses the
-  level camera, at 30 frames/s: the fall from one frame to the next. Its frames do not start with the fall, so it can read
-  less: a level fall of 9 mm reads 8.2 mm in the simulator and 4.5 to 8.6 mm on the camera. By calculation and scorer tests,
-  a set-down over its edge at up to 57 deg/s is not a drop and 58 deg/s is. A level free fall is one from about 7 mm, and
-  letting one side go from about 8 mm, in the simulator; from about 16 mm both read it as a drop whatever the frame timing. A
-  free fall from the balance point lands at about 340 deg/s.
+- **Dropped**: in a run of consecutive 30 frames/s frames in which no gripper touches it, its middle (the tape dot at the middle
+  of its end) comes down more than 1 cm; the run ends at the first frame in which a gripper touches it or its feet are down.
+  How fast it comes down while a gripper touches it does not matter.
+  - Read from the run's highest frame, on the same dot through the run: the one on the end the level camera sees when the run
+    starts. Feet down: the standing test's tilt and feet, as above.
+    After that no run starts until a gripper touches it with its feet off the table, so a rebound does not count.
+  - Touch: real trial, a visible touch by a finger or palm. Simulator: the physics engine's contact force between a finger or
+    palm link and the toaster, 0.05 N or more (mechkit's default; estimate); a frame is every 8th physics step
+    from the reset. A wrist or forearm does not count. A gap of 2 or 3 mm can look like a touch on video.
+  - Accepted loss: a gripper that stays in contact while it comes down counts as touching even if it carries nothing, because
+    neither the camera nor this rule sees how much it carries.
+  - The rule is the same in simulation and on video, frame by frame. Frames do not start with a fall, so up to 1 cm is never a
+    drop, a level fall from rest over about 16 mm always is if it lands untouched (released while coming down at 0.24 m/s, over
+    about 24 mm; at 0.6 m/s, over about 36 mm; also if it lands untouched), and in between it depends on where the frames land.
 - **Moved while on**: from a start until it is cancelled, the middle of its four feet goes more than 2 cm from where it was at
   that start, or it turns more than 5 deg on the table (the booklet: "Do not move toaster while in operation"). The limits
   are far above what pressing the button does (under 0.01 mm and 0.01 deg in the demo) and far below any real move, and a
@@ -82,7 +89,7 @@ Inside the Isaac Lab-Arena environment with `yam-isaac-lab-arena` installed (the
         --scorer task_score --max-steps 1800 --store-frames --log-dir logs
 
 The scripted demo uses the same command with `--policy yam_scripted`. `TOASTER_DEBUG=1` prints the toaster's angle, pose,
-button, rest, fastest fall and turn so far, and any drop or hazard every 4 steps.
+button, rest, largest untouched fall, and any drop or hazard every 4 steps.
 
 The demo: the left hand braces the foot end of the edge it turns over while the right hand, fingers closed and pointing
 left and 45 deg down, pushes the top over at 8 deg/s and stops at 33 deg. The left hand goes round to the side it will come
@@ -96,7 +103,7 @@ arm sag from the arms' own encoders.
 - Two ordinary cameras at 30 frames/s, started together with a clap, a ruler in each picture: one level with the worktop
   about 1 m beyond the toaster, looking along -x (the heights of its corners and feet and how it turns); one at about x 0.5,
   y -0.7, 0.6 m up (the TOAST button as it lies and as it stands, where it stands on the table top, and the grippers). At the end: a bank card
-  under the feet and a tape measure to the table's edges and the grippers. Step through the frames only where it comes down.
+  under the feet and a tape measure to the table's edges and the grippers. A dot of tape marks the middle of each end.
 - **No cord.** There is no cord in the simulator, and in real trials the toaster is unplugged, its cord wound in the cord
   storage under its base. So the press cannot start anything in a trial: it stands for the start that would follow in a
   kitchen, where the toaster is plugged in. The booklet says to unplug it before moving it. A plugged-in cord would add

@@ -6,6 +6,7 @@ Run it:  inspect-robots run --embodiment yam_arena -E task=task.py -E object_jit
            --instruction "Start the toaster." --scorer task_score --max-steps 1800 ...
 """
 
+import copy
 import dataclasses
 import math
 import os
@@ -17,8 +18,8 @@ import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from closedloop import grip_rot, placeholder_demo  # noqa: E402  (hooks yam_scripted to run demo_script)
-from mechkit import (Joint, Mech, _quat_xyzw_matrix, _to_numpy, box, cyl, extrude, lamp, on_reset,  # noqa: E402
-                     released, set_lamp, step_count)
+from mechkit import (_CONTACT, TOUCH_LINKS, Joint, Mech, _quat_xyzw_matrix, _to_numpy, box, cyl, extrude,  # noqa: E402
+                     lamp, on_reset, released, set_lamp, step_count, touch_state, watch_touch)
 from yam_arena.constants import FINGER_CLOSED, PAD_TIP_PAST_TCP, PHYSICS_DT  # noqa: E402
 from yam_arena.task_file import TABLE_TOP  # noqa: E402
 
@@ -102,11 +103,16 @@ UP = np.array([0.0, -1.0, 0.0])  # the toaster's own "up" in its Mech frame
 TILT_OK, FEET_OK, EDGE_IN = 10.0, 0.001, 0.05  # standing: degrees, metres from the table top, metres in from its edges
 LIFTED = 0.005  # once started it may not be taken off its feet: no foot over 5 mm off the table top
 MOVED, SWUNG = 0.020, 5.0  # nor moved: the middle of its feet 2 cm, or its heading 5 deg, from where it was at that start
-# Every physics step (1/240 s) is sampled. Dropped: in any 1/30 s (8 steps, one frame of 30 fps video) a corner comes down
-# over 7 mm (0.21 m/s, the far feet's speed when it is set down at 58 deg/s). At rest: over the last 0.5 s (120 steps) no
-# two positions of any corner are more than 2.5 mm apart.
-FRAME, FALL = 8, 0.007
+# Every physics step (1/240 s) is sampled. At rest: over the last 0.5 s (120 steps) no two positions of any corner are more
+# than 2.5 mm apart.
 REST, RANGE = 120, 0.0025
+# Dropped: only every 8th step (30 frames/s, fixed from the reset) is used. In a run of frames in which no gripper touches it,
+# its middle (the tape dot on the end the level camera sees when the run starts, the same dot through the run) comes down
+# over 1 cm from the run's highest frame. A touch or its
+# feet being down ends the run; after its feet are down no run starts until a gripper touches it with its feet off the table.
+FRAME, FALL = 8, 0.010
+DOTS = np.array([U(-D / 2, 0, H / 2), U(D / 2, 0, H / 2)])
+watch_touch("toaster", links=TOUCH_LINKS)  # fingers and palms; a touch is 0.05 N, mechkit's default (estimate)
 
 
 def _angle(c):
@@ -119,11 +125,14 @@ class Trial:
     def __init__(self):
         self.on, self.down, self.hazard, self.dropped, self.moved = False, False, None, None, None
         self.start, self.drift = None, (0.0, 0.0)
-        self.n, self.tilt, self.standing, self.gap, self.fastest = 0, 90.0, False, 1.0, 0.0
+        self.n, self.tilt, self.standing, self.gap = 0, 90.0, False, 1.0
+        self.armed, self.top, self.fell, self.end = True, None, 0.0, 1  # the drop rule: in force; the run's highest dot and
+        # its end (kept through the run); the largest fall
         self.corners = deque(maxlen=REST + 1)
 
-    def sample(self, R, p, travel):
-        """``R``, ``p``: the toaster's rotation and origin; ``travel``: how far the TOAST button is in."""
+    def sample(self, R, p, travel, touch=False):
+        """``R``, ``p``: the toaster's rotation and origin; ``travel``: how far the TOAST button is in; ``touch``: a
+        gripper touches it."""
         self.n += 1
         self.tilt = _angle((R @ UP)[2])
         feet, corners = FEET @ R.T + p, CORNERS @ R.T + p
@@ -151,11 +160,22 @@ class Trial:
         self.corners.append(corners)
         if corners[:, 2].min() < TOP - 0.05:
             self.hazard = self.hazard or "off the table"
-        if len(self.corners) > FRAME:
-            fall = float((self.corners[-1 - FRAME] - corners)[:, 2].max())
-            self.fastest = max(self.fastest, fall)
-            if fall > FALL and self.dropped is None:
-                self.dropped = f"came down {fall * 1000:.1f} mm in 1/30 s at {self.tilt:.0f} deg from upright"
+        if self.n % FRAME == 0:  # one video frame
+            dots = DOTS @ R.T + p
+            if self.top is None:  # a run starts here or none is running: the dot on the end the level camera sees
+                self.end = int(np.argmax(dots[:, 0]))
+            dot = float(dots[self.end, 2])
+            if touch:
+                self.top = None
+            elif self.armed:
+                self.top = dot if self.top is None else max(self.top, dot)
+                self.fell = max(self.fell, self.top - dot)
+                if self.top - dot > FALL and self.dropped is None:
+                    self.dropped = f"came down {(self.top - dot) * 1000:.0f} mm untouched, {self.tilt:.0f} deg from upright"
+            if self.tilt <= TILT_OK and self.gap <= FEET_OK:  # its feet are down
+                self.armed, self.top = False, None
+            elif touch:
+                self.armed = True
 
     def still(self):
         c = np.array(self.corners)  # samples x corners x 3; compare every two samples
@@ -172,6 +192,7 @@ class Trial:
 
 
 TRIAL = Trial()
+PENDING = {}  # the last physics step's pose: judged at the next update, with the contacts of its own step
 
 
 @on_reset
@@ -179,6 +200,7 @@ def _new_trial(env):
     """Clear the trial, and sample it after every physics step: Isaac Lab calls the scene's update then."""
     TRIAL.__init__()
     scene = env.unwrapped.scene
+    PENDING.clear()
     if getattr(scene, "_toaster_hook", False):
         return
     update, toaster = scene.update, scene["toaster"]
@@ -189,8 +211,13 @@ def _new_trial(env):
             if abs(dt - PHYSICS_DT) > 1e-6:
                 raise RuntimeError(f"toaster: the scorer needs a sample every {PHYSICS_DT} s, not every {dt} s")
             pose = _to_numpy(toaster.data.root_link_pose_w)[0].astype(float)
-            TRIAL.sample(_quat_xyzw_matrix(pose[3:]), pose[:3] - _to_numpy(scene.env_origins)[0],
-                         float(_to_numpy(toaster.data.joint_pos)[0, 0]))
+            contact = touch_state("toaster")  # read by mechkit just before this step: the previous step's contacts
+            if contact.source != "physx" or _CONTACT["error"]:
+                raise RuntimeError(f"toaster: no measured contacts ({contact.source}, {_CONTACT['error']})")
+            if PENDING:  # so the trial runs one physics step (4 ms) behind
+                TRIAL.sample(*PENDING["pose"], contact.touching)
+            PENDING["pose"] = (_quat_xyzw_matrix(pose[3:]), pose[:3] - _to_numpy(scene.env_origins)[0],
+                               float(_to_numpy(toaster.data.joint_pos)[0, 0]))
         return out
 
     scene.update, scene._toaster_hook = sampled_update, True
@@ -199,11 +226,17 @@ def _new_trial(env):
 def score(objects):
     """0 for the rest of the trial once the toaster is started while not standing, or taken off its feet while on, or falls
     off the table. Else, at the end: 0 unless it stands; 0.25 if ever dropped, or moved while on; 0.5 off; 0.75 on; 1.0 on, let go, at rest."""
-    t = objects["toaster"]
-    set_lamp(TOASTER, "toast", "on" if TRIAL.on else "off")
+    t, trial = objects["toaster"], TRIAL
+    if PENDING:  # the last step, judged on a copy with the contacts mechkit read after the control step (that step's)
+        contact = touch_state("toaster")
+        if contact.source != "physx" or _CONTACT["error"]:
+            raise RuntimeError(f"toaster: no measured contacts ({contact.source}, {_CONTACT['error']})")
+        trial = copy.deepcopy(TRIAL)
+        trial.sample(*PENDING["pose"], contact.touching)
+    set_lamp(TOASTER, "toast", "on" if trial.on else "off")
     if os.environ.get("TOASTER_DEBUG"):
         _debug(t)
-    return TRIAL.value(released(t, lo=(-D / 2 - 0.012, -H - 0.004, 0.0), hi=(D / 2, 0.0, W)))
+    return trial.value(released(t, lo=(-D / 2 - 0.012, -H - 0.004, 0.0), hi=(D / 2, 0.0, W)))
 
 
 def success(objects):
@@ -340,7 +373,7 @@ def _debug(t):
         _debug.k, o = k, t.origin
         print(f"TOASTDBG {k} turned {_turned(t):.1f} tilt {TRIAL.tilt:.1f} at ({o[0]:.3f},{o[1]:.3f},{o[2] - TOP:.3f}) button "
               f"{t.joints['toast'] * 1000:.2f}mm on {TRIAL.on} standing {TRIAL.standing} still {TRIAL.still()} samples "
-              f"{TRIAL.n} feet {TRIAL.gap * 1000:.2f}mm fastest {TRIAL.fastest * 1000:.1f}mm per 1/30 s drift "
+              f"{TRIAL.n} feet {TRIAL.gap * 1000:.2f}mm untouched fall {TRIAL.fell * 1000:.1f}mm armed {TRIAL.armed} drift "
               f"{TRIAL.drift[0] * 1000:.2f}mm {TRIAL.drift[1]:.2f}deg drop {TRIAL.dropped} moved {TRIAL.moved} hazard {TRIAL.hazard}", flush=True)
 
 
